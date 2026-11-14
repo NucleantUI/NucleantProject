@@ -79,7 +79,7 @@ def test_android_project(project: Path):
     assert 'environment("NUCLEANT_ANDROID_USE_AHARDWAREBUFFER"' not in build  # only from [swift.env]
     assert "zipPythonAssets" not in build  # Python layer off
     # Empty when nothing is a path dependency: Kotlin can't infer `listOf()`.
-    assert "val vendoredNativeRoots = listOf<File>(" in build
+    assert "val vendoredNativeRoots = listOf<String>(\n\n)" in build
     assert "val swiftRuntimeLibs = listOf<String>(" in build
 
     activity = (dist / "app/src/main/java/org/example/myapp/MainActivity.java").read_text()
@@ -234,3 +234,25 @@ def test_nucleantui_table_errors(tmp_path: Path, data: dict, match: str):
 def test_portable_relpath():
     assert portable_relpath(Path("/a/b/c"), Path("/a/d")) == "../b/c"
     assert portable_relpath(Path("/Users/x/ui"), Path("/private/tmp/app")) == "/Users/x/ui"
+
+
+def test_android_vendored_roots_from_path_dependency(project: Path, tmp_path: Path):
+    """A path dependency's siblings with Android artifacts are listed as paths."""
+    vendored = tmp_path / "deps" / "NucleantThing" / "Dependencies" / "android"
+    (vendored / "x86_64" / "lib").mkdir(parents=True)
+    fork = tmp_path / "deps" / "NucleantUI"
+    fork.mkdir(parents=True)
+    toml = project / "nucleant.toml"
+    toml.write_text(toml.read_text().replace(
+        '[nucleantui]\nbranch = "master"\n', f'[nucleantui]\npath = "{fork}"\n'
+    ))
+    dist = project / "project_dist" / "gradle"
+    (dist / "gradle" / "wrapper").mkdir(parents=True)
+    (dist / "gradle" / "wrapper" / "gradle-wrapper.jar").write_bytes(b"")
+    (dist / "gradlew").write_text("")
+    config = NucleantToml.load(project)
+    get_bootstrap("nucleantui", config, FakeGradleDelegate(project)).generate(
+        platform="android", sdk_path="/opt/android-sdk"
+    )
+    build = (dist / "app" / "build.gradle.kts").read_text()
+    assert f'val vendoredNativeRoots = listOf<String>(\n    "{vendored}",\n)' in build
