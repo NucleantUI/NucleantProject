@@ -1,0 +1,623 @@
+"""Resolves the Android SDK, NDK, and Java paths needed to build the project.
+
+Priority order for each tool:
+  1. System environment variables (ANDROID_HOME, ANDROID_NDK_ROOT, JAVA_HOME)
+  2. Explicit path set in nucleant.toml [android] (sdk_path / ndk_path / java_path)
+  3. nucleant-managed install under either:
+        <project_dir>/.nucleant/android-sdk  (when ``global_tools = false``)
+        ~/.nucleant/android-sdk              (when ``global_tools = true``)
+"""
+
+from __future__ import annotations
+
+import os
+import platform
+import re
+import shutil
+import subprocess
+import sys
+import urllib.request
+import zipfile
+from dataclasses import dataclass
+from pathlib import Path
+
+from ..nucleant_toml import AndroidData
+
+
+_CMDLINE_TOOLS_URLS = {
+    "darwin": "https://dl.google.com/android/repository/commandlinetools-mac-11076708_latest.zip",
+    "linux": "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip",
+    "win32": "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip",
+}
+
+SDKMAN_INSTALL_URL = "https://get.sdkman.io"
+DEFAULT_API_VERSION = 36
+DEFAULT_SDK_VERSION = "36"
+DEFAULT_NDK_VERSION = "28.2.13676358"
+DEFAULT_CMAKE_VERSION = "3.22.1"
+
+_NDK_VERSION_MAP = {
+    "25": "25.2.9519653",  # r25c
+    "26": "26.3.11579264",  # r26d
+    "27": "27.3.13750724",  # r27d (LTS)
+    "28": "28.2.13676358",  # r28c
+    "29": "29.0.14206865",  # r29 stable
+    "30": "30.0.14608247",  # r30 beta
+    # --- Explicit Revisions ---
+    "25a": "25.0.8775105",
+    "25b": "25.1.8937393",
+    "25c": "25.2.9519653",
+    "26a": "26.0.10792818",
+    "26b": "26.1.10909125",
+    "26c": "26.2.11381408",
+    "26d": "26.3.11579264",
+    "27a": "27.0.12077973",
+    "27b": "27.1.12297006",
+    "27c": "27.2.12479018",
+    "27d": "27.3.13750724",
+    "28a": "28.0.12916984",
+    "28b": "28.1.13356709",
+    "28c": "28.2.13676358",
+}
+
+# sdkmanager (Android cmdline-tools) is known to crash (SIGSEGV) on Java >= 22.
+# Pin sdkman installs to this LTS identifier and reject newer detections.
+_SDKMAN_JAVA_ID = "21.0.7-tem"  # Temurin 21 LTS — update when new patch ships
+_SDKMANAGER_MAX_JAVA = 21
+
+
+def host_emulator_abi() -> str:
+    """Pick a system-image ABI that matches the host CPU."""
+    machine = platform.machine().lower()
+    if machine in ("arm64", "aarch64"):
+        return "arm64-v8a"
+    return "x86_64"
+
+
+class AndroidToolchainError(Exception):
+    pass
+
+
+@dataclass
+class AndroidToolchain:
+    sdk_path: str
+    ndk_path: str
+    java_path: str
+    ndk_version: str = ""
+
+    @staticmethod
+    def managed_sdk_root(
+        project_dir: Path,
+        android: AndroidData | None = None,
+    ) -> Path:
+        if android is not None:
+            return android.tools_root(project_dir) / "android-sdk"
+        return project_dir / ".nucleant" / "android-sdk"
+
+    @classmethod
+    def find_sdk_path(
+        cls,
+        android: AndroidData | None,
+        project_dir: Path,
+    ) -> str | None:
+        """Locate an existing SDK path without downloading or installing anything.
+
+        Returns None if no SDK can be found (e.g. first build hasn't run yet).
+        """
+        global_tools = android.global_tools if android is not None else False
+        if global_tools:
+            env = os.environ.get("ANDROID_HOME")
+            if env and Path(env).is_dir():
+                return env
+
+        if android and android.sdk_path and Path(android.sdk_path).is_dir():
+            return str(android.sdk_path)
+
+        managed = cls.managed_sdk_root(project_dir, android)
+        if managed.is_dir():
+            return str(managed)
+
+        return None
+
+    @classmethod
+    def find_ndk_path(
+        cls,
+        android: AndroidData | None,
+        project_dir: Path,
+    ) -> str | None:
+        """Locate an existing NDK path without downloading or installing anything.
+
+        Returns None if no NDK can be found (e.g. first build hasn't run yet).
+        """
+        global_tools = android.global_tools if android is not None else False
+        if global_tools:
+            env = os.environ.get("ANDROID_NDK_ROOT")
+            if env and Path(env).is_dir():
+                return env
+
+        if android and android.ndk_path and Path(android.ndk_path).is_dir():
+            return str(android.ndk_path)
+
+        ndk_user = android.ndk if android else None
+        if ndk_user:
+            ndk_clean = ndk_user.lower().lstrip("r")
+            ndk_version = _NDK_VERSION_MAP.get(ndk_clean, ndk_user)
+        else:
+            ndk_version = DEFAULT_NDK_VERSION
+
+        sdk = cls.find_sdk_path(android, project_dir)
+        if sdk is None:
+            return None
+
+        ndk_in_sdk = Path(sdk) / "ndk" / ndk_version
+        if ndk_in_sdk.is_dir():
+            return str(ndk_in_sdk)
+
+        return None
+
+    @classmethod
+    def resolve(
+        cls,
+        android: AndroidData | None,
+        project_dir: Path,
+    ) -> "AndroidToolchain":
+        if sys.platform not in _CMDLINE_TOOLS_URLS:
+            raise AndroidToolchainError(
+                f"AndroidToolchain does not support platform: {sys.platform}"
+            )
+
+        sdk_version = (android.sdk if android else None) or DEFAULT_SDK_VERSION
+
+        ndk_user = android.ndk if android else None
+        if ndk_user:
+            ndk_clean = ndk_user.lower().lstrip("r")
+            ndk_version = _NDK_VERSION_MAP.get(ndk_clean, ndk_user)
+        else:
+            ndk_version = DEFAULT_NDK_VERSION
+
+        # Java first — sdkmanager needs it
+        java_path = _resolve_java(android)
+        sdk_path = _resolve_sdk(
+            android, sdk_version, ndk_version, java_path, project_dir
+        )
+        
+        # Resolve NDK path using the corrected user-first priority flow
+        ndk_path = _resolve_ndk(android, sdk_path, ndk_version, java_path)
+        _ensure_emulator(sdk_path, sdk_version, java_path)
+
+        # Read the absolute ground-truth version directly from the installation's source.properties
+        resolved_ndk_version = _get_actual_ndk_version(ndk_path, ndk_version)
+
+        return cls(
+            sdk_path=sdk_path,
+            ndk_path=ndk_path,
+            java_path=java_path,
+            ndk_version=resolved_ndk_version,
+        )
+
+
+# ---------------------------------------------------------------------------
+# SDK
+# ---------------------------------------------------------------------------
+
+
+def _ensure_cmdline_tools(sdk_root: Path) -> Path:
+    """Ensures cmdline-tools exist, finding existing Android Studio installs or downloading."""
+    sdk_root.mkdir(parents=True, exist_ok=True)
+    cmdline_tools_dir = sdk_root / "cmdline-tools"
+    sdk_exe = "sdkmanager.bat" if sys.platform == "win32" else "sdkmanager"
+
+    default_sdkmanager = cmdline_tools_dir / "latest" / "bin" / sdk_exe
+    if default_sdkmanager.exists():
+        return default_sdkmanager
+
+    if cmdline_tools_dir.exists():
+        # Check if it's directly inside cmdline-tools/bin
+        direct_candidate = cmdline_tools_dir / "bin" / sdk_exe
+        if direct_candidate.exists():
+            return direct_candidate
+
+        # Check inside subfolders (like latest/, 11.0/, cmdline-tools/, etc.)
+        for child in cmdline_tools_dir.iterdir():
+            if child.is_dir() and child.name != "bin":
+                candidate = child / "bin" / sdk_exe
+                if candidate.exists():
+                    return candidate
+
+    # 3. If missing, download it
+    print("[nucleant] Downloading Android cmdline-tools...")
+    cmdline_tools_zip = sdk_root / "commandlinetools.zip"
+    url = _CMDLINE_TOOLS_URLS[sys.platform]
+    urllib.request.urlretrieve(url, cmdline_tools_zip)
+
+    cmdline_tools_dir.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(cmdline_tools_zip) as zf:
+        zf.extractall(cmdline_tools_dir)
+
+    # sdkmanager requires the directory to be named "latest"
+    unpacked = cmdline_tools_dir / "cmdline-tools"
+    if unpacked.exists():
+        if default_sdkmanager.parent.parent.exists():
+            shutil.rmtree(default_sdkmanager.parent.parent)
+        unpacked.rename(default_sdkmanager.parent.parent)
+    cmdline_tools_zip.unlink(missing_ok=True)
+
+    _restore_cmdline_tools_exec_bits(sdk_root)
+    return default_sdkmanager
+
+
+def _resolve_sdk(
+    android: AndroidData | None,
+    sdk_version: str,
+    ndk_version: str,
+    java_path: str,
+    project_dir: Path,
+) -> str:
+    global_tools = android.global_tools if android is not None else False
+    if global_tools:
+        env = os.environ.get("ANDROID_HOME")
+        if env:
+            return env
+
+    if android and android.sdk_path:
+        return str(android.sdk_path)
+
+    managed = AndroidToolchain.managed_sdk_root(project_dir, android)
+    platforms_dir = managed / "platforms" / f"android-{sdk_version}"
+    if not platforms_dir.exists():
+        _install_sdk(managed, sdk_version, ndk_version, java_path)
+
+    _restore_cmdline_tools_exec_bits(managed)
+
+    # CMake is required by AGP's externalNativeBuild but wasn't always
+    # installed in older runs. Top it up if missing.
+    cmake_exe = "cmake.exe" if sys.platform == "win32" else "cmake"
+    if not (managed / "cmake" / DEFAULT_CMAKE_VERSION / "bin" / cmake_exe).exists():
+        _sdkmanager_install(managed, java_path, [f"cmake;{DEFAULT_CMAKE_VERSION}"])
+    return str(managed)
+
+def _resolve_ndk(
+    android: AndroidData | None,
+    sdk_path: str,
+    ndk_version: str,
+    java_path: str,
+) -> str:
+    """Locate or install the NDK path, prioritizing explicit user choices over env vars."""
+    
+    # 1. Absolute highest priority: User set an explicit file system path
+    if android and android.ndk_path and Path(android.ndk_path).is_dir():
+        return str(android.ndk_path)
+
+    # 2. Second highest priority: User defined a specific version string (e.g., android.ndk = "27")
+    # We MUST check if this specific version is installed or install it, bypassing env variables.
+    ndk_user = android.ndk if android else None
+    ndk_in_sdk = Path(sdk_path) / "ndk" / ndk_version
+
+    if ndk_user:
+        if not ndk_in_sdk.is_dir():
+            print(f"[nucleant] User-requested NDK {ndk_version} is missing. Installing...")
+            _sdkmanager_install(Path(sdk_path), java_path, [f"ndk;{ndk_version}"])
+        
+        if ndk_in_sdk.is_dir():
+            return str(ndk_in_sdk)
+        raise AndroidToolchainError(f"Failed to install user-requested NDK version: {ndk_version}")
+
+    # 3. Third priority: System environment variables (only evaluated if user didn't lock down a version)
+    global_tools = android.global_tools if android is not None else False
+    if global_tools:
+        env = os.environ.get("ANDROID_NDK_ROOT")
+        if env and Path(env).is_dir():
+            return env
+
+    # 4. Lowest priority: Fallback to the default managed toolchain NDK version
+    if not ndk_in_sdk.is_dir():
+        print(f"[nucleant] Default NDK {ndk_version} is missing. Installing...")
+        _sdkmanager_install(Path(sdk_path), java_path, [f"ndk;{ndk_version}"])
+
+    if not ndk_in_sdk.is_dir():
+        raise AndroidToolchainError(
+            f"Android NDK {ndk_version} install appeared to succeed but "
+            f"{ndk_in_sdk} still not found."
+        )
+    return str(ndk_in_sdk)
+
+
+def _get_actual_ndk_version(ndk_path: str, fallback: str) -> str:
+    """Parse the true NDK version from its source.properties file."""
+    props_path = Path(ndk_path) / "source.properties"
+    if props_path.is_file():
+        try:
+            content = props_path.read_text(encoding="utf-8")
+            match = re.search(r"Pkg\.Revision\s*=\s*([\d\.]+)", content)
+            if match:
+                return match.group(1).strip()
+        except Exception:
+            pass
+            
+    # Fallback: check if the parent directory name is already a clean version number
+    folder_name = Path(ndk_path).name
+    if re.match(r"^[\d\.]+$", folder_name):
+        return folder_name
+        
+    return fallback
+
+
+def _install_sdk(
+    sdk_root: Path, sdk_version: str, ndk_version: str, java_path: str
+) -> None:
+    sdkmanager = _ensure_cmdline_tools(sdk_root)
+
+    env = os.environ.copy()
+    env["ANDROID_HOME"] = str(sdk_root)
+    env["JAVA_HOME"] = java_path
+
+    packages = [
+        "platform-tools",
+        "emulator",
+        f"platforms;android-{sdk_version}",
+        f"build-tools;{sdk_version}.0.0",
+        f"ndk;{ndk_version}",
+        f"cmake;{DEFAULT_CMAKE_VERSION}",
+        f"system-images;android-{sdk_version};google_apis;{host_emulator_abi()}",
+    ]
+
+    print(
+        f"[nucleant] Installing Android SDK platform {sdk_version} "
+        f"and NDK {ndk_version}..."
+    )
+
+    # Accept licenses first
+    _run_sdkmanager(str(sdkmanager), ["--licenses"], env=env, stdin_input="y\n" * 5)
+
+    for pkg in packages:
+        _run_sdkmanager(str(sdkmanager), ["--install", pkg], env=env)
+
+    print(f"[nucleant] Android toolchain installed at {sdk_root}")
+
+
+def _restore_cmdline_tools_exec_bits(sdk_root: Path) -> None:
+    """Restore executable bits for all shell wrappers in cmdline-tools/latest/bin.
+
+    Python's zipfile extraction does not preserve Unix executable bits from
+    Google's cmdline-tools zip. Any file starting with a shebang is a shell
+    wrapper intended to be run directly.
+    """
+    if sys.platform == "win32":
+        return
+
+    bin_dir = sdk_root / "cmdline-tools" / "latest" / "bin"
+    if not bin_dir.is_dir():
+        return
+    for tool in bin_dir.iterdir():
+        if not tool.is_file():
+            continue
+        try:
+            if tool.read_bytes()[:2] == b"#!":
+                os.chmod(tool, tool.stat().st_mode | 0o111)
+        except OSError as exc:
+            raise AndroidToolchainError(f"Unable to chmod {tool}: {exc}") from exc
+
+
+def _sdkmanager_install(sdk_root: Path, java_path: str, packages: list[str]) -> None:
+    sdkmanager = _ensure_cmdline_tools(sdk_root)
+
+    env = os.environ.copy()
+    env["ANDROID_HOME"] = str(sdk_root)
+    env["JAVA_HOME"] = java_path
+    print(f"[nucleant] Installing missing SDK packages: {', '.join(packages)}")
+    for pkg in packages:
+        _run_sdkmanager(str(sdkmanager), ["--install", pkg], env=env)
+
+
+def _run_sdkmanager(
+    sdkmanager: str,
+    args: list[str],
+    env: dict[str, str],
+    stdin_input: str | None = None,
+) -> None:
+    # On Linux without KVM (e.g. QEMU software emulation) the JVM's C2 JIT
+    # compiles crypto code using AES-NI / SHA CPU intrinsics that QEMU doesn't
+    # implement, causing SIGSEGV in sun.security.jca / libjvm.  Limiting
+    # tiered compilation to level 1 (client compiler only, no C2) avoids
+    # the crash.  JAVA_TOOL_OPTIONS is honoured by all JVM invocations.
+    if sys.platform == "linux" and "JAVA_TOOL_OPTIONS" not in env:
+        env["JAVA_TOOL_OPTIONS"] = "-XX:TieredStopAtLevel=1 -Xshare:off"
+
+    if sys.platform == "win32" and not sdkmanager.endswith(".bat"):
+        sdkmanager += ".bat"
+
+    use_shell = sys.platform == "win32"
+
+    if "ANDROID_HOME" in env:
+        args = [f"--sdk_root={env['ANDROID_HOME']}"] + args
+
+    result = subprocess.run(
+        [sdkmanager, *args], env=env, input=stdin_input, text=True, shell=use_shell
+    )
+    if result.returncode != 0:
+        raise AndroidToolchainError(
+            f"sdkmanager '{' '.join(args)}' exited with code {result.returncode}"
+        )
+
+
+def _ensure_emulator(sdk_path: str, sdk_version: str, java_path: str) -> None:
+    """Install the emulator + a host-arch system image if missing."""
+    sdk_root = Path(sdk_path)
+
+    emu_exe = "emulator.exe" if sys.platform == "win32" else "emulator"
+    emulator_bin = sdk_root / "emulator" / emu_exe
+
+    abi = host_emulator_abi()
+    system_images_root = sdk_root / "system-images"
+
+    # 1. Fuzzy match the API folder (e.g., allow "android-36.1" when looking for "36")
+    sysimg_exists = False
+    if system_images_root.exists():
+        for api_dir in system_images_root.iterdir():
+            if api_dir.is_dir() and api_dir.name.startswith(f"android-{sdk_version}"):
+                # 2. Check if *any* system image variant for this ABI exists inside
+                for tag_dir in api_dir.iterdir():
+                    if tag_dir.is_dir() and (tag_dir / abi).exists():
+                        sysimg_exists = True
+                        break
+
+    if emulator_bin.exists() and sysimg_exists:
+        return
+
+    try:
+        sdkmanager = _ensure_cmdline_tools(sdk_root)
+    except Exception:
+        return
+
+    env = os.environ.copy()
+    env["ANDROID_HOME"] = str(sdk_root)
+    env["JAVA_HOME"] = java_path
+
+    print(f"[nucleant] Installing Android emulator + system image ({abi})...")
+
+    # 3. Safely attempt download without crashing the build if it fails
+    try:
+        if not emulator_bin.exists():
+            _run_sdkmanager(str(sdkmanager), ["--install", "emulator"], env=env)
+        if not sysimg_exists:
+            _run_sdkmanager(
+                str(sdkmanager),
+                [
+                    "--install",
+                    f"system-images;android-{sdk_version};google_apis;{abi}",
+                ],
+                env=env,
+                stdin_input="y\n",
+            )
+    except Exception as e:
+        print(f"[nucleant] Warning: Emulator setup failed ({e})")
+        print("[nucleant] Skipping emulator setup to continue build...")
+
+
+# ---------------------------------------------------------------------------
+# Java
+# ---------------------------------------------------------------------------
+
+
+def _java_major_version(java_home: str) -> int | None:
+    """Return the major Java version number for the JDK at *java_home*, or None."""
+    exe_name = "java.exe" if sys.platform == "win32" else "java"
+    java_bin = Path(java_home) / "bin" / exe_name
+
+    if not java_bin.exists():
+        return None
+    try:
+        result = subprocess.run(
+            [str(java_bin), "-version"], capture_output=True, text=True
+        )
+        for line in (result.stderr + result.stdout).splitlines():
+            if "version" in line:
+                m = re.search(r'"(\d+)', line)
+                if m:
+                    return int(m.group(1))
+    except Exception:
+        pass
+    return None
+
+
+def _is_java_compatible(java_home: str) -> bool:
+    major = _java_major_version(java_home)
+    return major is not None and 17 <= major <= _SDKMANAGER_MAX_JAVA
+
+
+def _resolve_java(android: AndroidData | None) -> str:
+    env = os.environ.get("JAVA_HOME")
+    if env and _is_java_compatible(env):
+        return env
+
+    if android and android.java_path:
+        return str(android.java_path)
+
+    sdkman_current = Path.home() / ".sdkman" / "candidates" / "java" / "current"
+    if sdkman_current.exists() and _is_java_compatible(str(sdkman_current)):
+        return str(sdkman_current)
+
+    detected = _detect_system_java_home()
+    if detected and _is_java_compatible(detected):
+        return detected
+
+    incompatible = detected or os.environ.get("JAVA_HOME")
+    if incompatible:
+        major = _java_major_version(incompatible)
+        print(
+            f"[nucleant] Detected Java {major} at {incompatible} — "
+            f"sdkmanager requires Java <= {_SDKMANAGER_MAX_JAVA}. "
+            f"Installing compatible JDK via sdkman..."
+        )
+
+    return _install_java_via_sdkman()
+
+
+def _detect_system_java_home() -> str | None:
+    # macOS: /usr/libexec/java_home
+    if sys.platform == "darwin":
+        try:
+            result = subprocess.run(
+                ["/usr/libexec/java_home"], capture_output=True, text=True
+            )
+        except FileNotFoundError:
+            return None
+        if result.returncode != 0:
+            return None
+        out = result.stdout.strip()
+        return out or None
+
+    # Linux/Windows: resolve JAVA_HOME from the javac symlink/path
+    cmd = "where" if sys.platform == "win32" else "which"
+    try:
+        result = subprocess.run([cmd, "javac"], capture_output=True, text=True)
+        if result.returncode != 0:
+            return None
+        first_line = result.stdout.strip().splitlines()[0]
+        javac = Path(first_line).resolve()
+
+        # <java_home>/bin/javac → go up two levels
+        java_home = javac.parent.parent
+        return str(java_home) if java_home.exists() else None
+    except Exception:
+        return None
+
+
+def _install_java_via_sdkman() -> str:
+    sdkman_init = Path.home() / ".sdkman" / "bin" / "sdkman-init.sh"
+
+    if not sdkman_init.exists():
+        print("[nucleant] Installing sdkman...")
+        installer = subprocess.run(
+            ["curl", "-s", SDKMAN_INSTALL_URL],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        proc = subprocess.run(["/bin/bash"], input=installer.stdout, text=True)
+        if proc.returncode != 0:
+            raise AndroidToolchainError(
+                f"sdkman installer exited with code {proc.returncode}"
+            )
+
+    print(f"[nucleant] Installing Java {_SDKMAN_JAVA_ID} via sdkman...")
+    proc = subprocess.run(
+        [
+            "/bin/bash",
+            "-c",
+            f'source "{sdkman_init}" && sdk install java {_SDKMAN_JAVA_ID}',
+        ],
+    )
+    if proc.returncode != 0:
+        raise AndroidToolchainError(
+            f"'sdk install java' exited with code {proc.returncode}"
+        )
+
+    installed = Path.home() / ".sdkman" / "candidates" / "java" / "current"
+    if not installed.exists():
+        raise AndroidToolchainError(
+            "Java installation via sdkman failed. Set java_path in "
+            "nucleant.toml [android] to point to an existing JDK."
+        )
+    print(f"[nucleant] Java installed at {installed}")
+    return str(installed)
