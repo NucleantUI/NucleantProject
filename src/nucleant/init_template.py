@@ -5,9 +5,6 @@ from __future__ import annotations
 from .gradle.android_toolchain import DEFAULT_API_VERSION, DEFAULT_SDK_VERSION
 from .nucleant_toml import DEFAULT_SWIFT_VERSION
 
-NUCLEANTUI_URL = "https://github.com/NucleantUI/NucleantUI.git"
-
-
 def nucleant_toml(
     app_name: str,
     module_name: str,
@@ -34,6 +31,17 @@ swiftly = true # false: use `swift` from PATH — it must be this exact version
 # android_sdk = "swift-{DEFAULT_SWIFT_VERSION}-RELEASE_android"
 # wasm_sdk = "swift-{DEFAULT_SWIFT_VERSION}-RELEASE_wasm"
 
+#### NucleantUI ####
+# The nucleantui bootstrap always builds the app against NucleantUI; this
+# picks which. One of branch / up_to_major / exact.
+
+[nucleantui]
+branch = "master"
+# up_to_major = "0.1.0" # 0.1.0 or newer, below 1.0.0
+# exact = "0.1.0"
+# url = "https://github.com/<you>/NucleantUI.git" # a fork
+# path = "../NucleantUI" # a local fork; takes no version
+
 #### The app's Swift ####
 # One list of sources and dependencies feeds every platform: the desktop
 # Package.swift (`swift run`), the Android Main Swift Package and the Xcode
@@ -51,11 +59,12 @@ sources = ["Sources/{target}"]
 # Emulator only: the virtual GPU has no VK_KHR_external_memory_fd.
 # NUCLEANT_ANDROID_USE_AHARDWAREBUFFER = "1"
 
-[[swift.dependencies]]
-name = "NucleantUI"
-url = "{NUCLEANTUI_URL}"
-branch = "master"
-products = ["NucleantUI"]
+# More Swift packages, besides NucleantUI:
+# [[swift.dependencies]]
+# name = "Yams"
+# url = "https://github.com/jpsim/Yams.git"
+# up_to_major = "6.0.0" # or branch / exact; or path = "../Yams"
+# products = ["Yams"]
 
 #### Android ####
 

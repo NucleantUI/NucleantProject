@@ -46,14 +46,17 @@ tool.
 | --- | --- |
 | root | `app_name`, `bootstrap` (`nucleantui`), `command_plugins` |
 | `[toolchain]` | `swift` (default `6.3.3`), `swiftly`, `android_sdk`, `wasm_sdk` |
+| `[nucleantui]` | which NucleantUI: `branch` (default `master`), `up_to_major` or `exact`; `url` for a fork, `path` for a local fork |
 | `[swift]` | `target`, `entry`, `sources`, `android_package`, `[swift.env]`, `[[swift.dependencies]]` |
 | `[android]` | package name, archs, API levels, NDK, signing-free build settings, hooks |
 | `[ios]`, `[macos]` | bundle id, deployment target, version, info_plist, entitlements, team |
 | `[linux]`, `[wasm]` | platform switches (`[wasm]` makes `toolchain install` fetch the wasm SDK) |
 | `[python]` | `enabled` — the Python layer, transferred but not enabled yet |
 
-One `[[swift.dependencies]]` list feeds the desktop `Package.swift`, the
-Android Main Swift Package and the Xcode project.
+NucleantUI is the bootstrap's own dependency, so it is never listed in
+`[[swift.dependencies]]`; that list is for packages on top of it (same
+`branch` / `up_to_major` / `exact` / `path` keys). Both feed the desktop
+`Package.swift`, the Android Main Swift Package and the Xcode project.
 
 ## Toolchain
 

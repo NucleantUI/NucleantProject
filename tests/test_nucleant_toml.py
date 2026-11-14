@@ -30,12 +30,8 @@ def test_template_uses_nucleantui_from_github():
     text = init_template.nucleant_toml("A", "a", "A", "AApp")
     data = tomllib.loads(text)
     assert data["swift"]["env"] == {}
-    assert data["swift"]["dependencies"] == [{
-        "name": "NucleantUI",
-        "url": "https://github.com/NucleantUI/NucleantUI.git",
-        "branch": "master",
-        "products": ["NucleantUI"],
-    }]
+    assert data["nucleantui"] == {"branch": "master"}
+    assert "dependencies" not in data["swift"]  # NucleantUI is implicit
     assert "LOCAL_DEV" not in text
 
 

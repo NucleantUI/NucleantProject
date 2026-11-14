@@ -162,20 +162,70 @@ def test_dependency_rendering(tmp_path: Path):
             "dependencies": [
                 {"name": "Thing", "path": "../Thing"},
                 {"name": "Pinned", "url": "https://x/Pinned.git", "exact": "1.2.3", "products": ["A", "B"]},
-                {"name": "Floor", "url": "https://x/Floor.git", "from": "0.1.0"},
+                {"name": "Floor", "url": "https://x/Floor.git", "up_to_major": "0.1.0"},
             ]
         }
     }
     swift = load_swift_config(root, data, "App")
-    thing, pinned, floor = swift.dependencies
+    ui, thing, pinned, floor = swift.dependencies
+    assert ui.as_package_dependency() == (
+        '.package(url: "https://github.com/NucleantUI/NucleantUI.git", branch: "master")'
+    )
     assert thing.as_package_dependency(root) == '.package(path: "../Thing")'
     assert pinned.as_package_dependency() == '.package(url: "https://x/Pinned.git", exact: "1.2.3")'
     assert pinned.as_target_dependencies() == [
         '.product(name: "A", package: "Pinned")',
         '.product(name: "B", package: "Pinned")',
     ]
+    assert floor.as_package_dependency() == '.package(url: "https://x/Floor.git", from: "0.1.0")'
     assert floor.as_xcodegen_package(root) == {"url": "https://x/Floor.git", "from": "0.1.0"}
     assert swift.sources == (root / "Sources" / "App",)  # default when it exists
+
+
+@pytest.mark.parametrize(
+    ("table", "package", "target"),
+    [
+        ({}, '.package(url: "https://github.com/NucleantUI/NucleantUI.git", branch: "master")',
+         '.product(name: "NucleantUI", package: "NucleantUI")'),
+        ({"up_to_major": "0.2.0"}, '.package(url: "https://github.com/NucleantUI/NucleantUI.git", from: "0.2.0")',
+         '.product(name: "NucleantUI", package: "NucleantUI")'),
+        ({"exact": "0.2.1"}, '.package(url: "https://github.com/NucleantUI/NucleantUI.git", exact: "0.2.1")',
+         '.product(name: "NucleantUI", package: "NucleantUI")'),
+        ({"url": "https://github.com/me/MyUI.git", "branch": "fix"},
+         '.package(url: "https://github.com/me/MyUI.git", branch: "fix")',
+         '.product(name: "NucleantUI", package: "MyUI")'),
+    ],
+)
+def test_nucleantui_table(tmp_path: Path, table: dict, package: str, target: str):
+    ui = load_swift_config(tmp_path, {"nucleantui": table}, "App").dependencies[0]
+    assert ui.as_package_dependency() == package
+    assert ui.as_target_dependencies() == [target]
+
+
+def test_nucleantui_local_fork(tmp_path: Path):
+    fork = tmp_path / "forks" / "NucleantUI"
+    fork.mkdir(parents=True)
+    root = tmp_path / "App"
+    root.mkdir()
+    ui = load_swift_config(root, {"nucleantui": {"path": "../forks/NucleantUI"}}, "App").dependencies[0]
+    assert ui.as_package_dependency(root) == '.package(path: "../forks/NucleantUI")'
+    assert ui.as_xcodegen_package(root) == {"path": "../forks/NucleantUI"}
+
+
+@pytest.mark.parametrize(
+    ("data", "match"),
+    [
+        ({"nucleantui": {"branch": "master", "exact": "0.1.0"}}, "not branch and exact"),
+        ({"nucleantui": {"from": "0.1.0"}}, "spelled 'up_to_major'"),
+        ({"nucleantui": {"version": "0.1.0"}}, "unknown key"),
+        ({"nucleantui": {"path": ".", "branch": "master"}}, "takes no url or version"),
+        ({"swift": {"dependencies": [{"name": "NucleantUI", "url": "https://x/NucleantUI.git",
+                                      "branch": "master"}]}}, r"\[nucleantui\] instead"),
+    ],
+)
+def test_nucleantui_table_errors(tmp_path: Path, data: dict, match: str):
+    with pytest.raises(SwiftConfigError, match=match):
+        load_swift_config(tmp_path, data, "App")
 
 
 def test_portable_relpath():
