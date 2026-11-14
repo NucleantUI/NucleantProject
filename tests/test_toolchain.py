@@ -57,3 +57,11 @@ def test_gradle_task_names():
     assert task(None, "release", aar=True, bundle=False) == "assembleRelease"
     with pytest.raises(GradleProjectError):
         task(None, "beta", aar=False, bundle=False)
+
+
+def test_device_abi_must_be_built():
+    check = GradleProject._check_abis
+    check("emulator-5554", ["x86_64"], ["arm64-v8a", "x86_64"])
+    check("emulator-5554", [], ["arm64-v8a"])
+    with pytest.raises(GradleProjectError, match='Add "x86_64" to archs'):
+        check("emulator-5554", ["x86_64", "x86"], ["arm64-v8a"])

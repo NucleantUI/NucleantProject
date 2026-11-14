@@ -78,6 +78,9 @@ def test_android_project(project: Path):
     assert "java.srcDir(nucleantJavaDir)" in build
     assert 'environment("NUCLEANT_ANDROID_USE_AHARDWAREBUFFER"' not in build  # only from [swift.env]
     assert "zipPythonAssets" not in build  # Python layer off
+    # Empty when nothing is a path dependency: Kotlin can't infer `listOf()`.
+    assert "val vendoredNativeRoots = listOf<File>(" in build
+    assert "val swiftRuntimeLibs = listOf<String>(" in build
 
     activity = (dist / "app/src/main/java/org/example/myapp/MainActivity.java").read_text()
     assert "extends NucleantActivity" in activity

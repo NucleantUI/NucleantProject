@@ -343,12 +343,15 @@ class GradleProject(NucleantProject):
         if uuid is not None and name is not None:
             raise GradleProjectError("run takes at most one of --uuid / --name")
 
-        apks = self.build(variant, clean=clean)
+        # The device first: an ABI the build does not cover is cheap to catch
+        # now and expensive after a full Swift cross-compile.
         adb, emulator = self._require_sdk()
         serial = self._pick_target(adb, emulator, uuid, name)
-
         device_abis = adb.get_device_abis(serial)
         print(f"[nucleant] Detected device ABIs: {', '.join(device_abis)}")
+        self._check_abis(serial, device_abis, [a.value for a in self.android_data.archs])
+
+        apks = self.build(variant, clean=clean)
         best_apk = self._match_apk(apks, device_abis)
 
         print(f"[nucleant] Installing {best_apk.name} on {serial}...")
@@ -356,6 +359,16 @@ class GradleProject(NucleantProject):
         adb.start_app(serial, self.android_data.package_name)
         if logcat:
             self._stream_logcat(adb, serial)
+
+    @staticmethod
+    def _check_abis(serial: str, device_abis: list[str], archs: list[str]) -> None:
+        if not device_abis or any(abi in archs for abi in device_abis):
+            return  # nothing reported: let the install say what's wrong
+        wanted = next((abi for abi in device_abis if abi in ("arm64-v8a", "x86_64")), device_abis[0])
+        raise GradleProjectError(
+            f"{serial} runs {', '.join(device_abis)}, but [android] archs only builds "
+            f"{', '.join(archs)}. Add \"{wanted}\" to archs in nucleant.toml."
+        )
 
     @staticmethod
     def _match_apk(apks: list[Path], device_abis: list[str]) -> Path:
