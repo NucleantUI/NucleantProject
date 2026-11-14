@@ -11,7 +11,6 @@ import subprocess
 from pathlib import Path
 
 from nucleant_bootstraps.bootstraps.nucleantui import ANDROID_TEMPLATE_FILES
-from nucleant_bootstraps.bootstraps.nucleantui.swift_config import portable_relpath
 from nucleant_bootstraps.tools import swift_identifier
 
 from . import init_template as tmpl
@@ -30,7 +29,6 @@ class ProjectInit:
         self,
         project_path: Path,
         app_name: str | None = None,
-        nucleantui_path: Path | None = None,
     ) -> None:
         self.project_path = Path(project_path).resolve()
         self.app_name = app_name or self.project_path.name
@@ -39,7 +37,6 @@ class ProjectInit:
         # `struct MyApp` inside module `MyApp` makes the type and the module
         # ambiguous to Swift, hence the SwiftUI-style `…App` suffix.
         self.entry = f"{self.target}App"
-        self.nucleantui_path = Path(nucleantui_path).resolve() if nucleantui_path else None
 
     def run(self) -> None:
         self.project_path.mkdir(parents=True, exist_ok=True)
@@ -83,14 +80,9 @@ class ProjectInit:
         return True
 
     def _write_nucleant_toml(self) -> None:
-        rel_ui = None
-        if self.nucleantui_path is not None:
-            if not (self.nucleantui_path / "Package.swift").is_file():
-                raise ProjectInitError(f"{self.nucleantui_path} has no Package.swift")
-            rel_ui = portable_relpath(self.nucleantui_path, self.project_path)
         self._write_if_missing(
             NUCLEANT_TOML,
-            tmpl.nucleant_toml(self.app_name, self.module_name, self.target, self.entry, rel_ui),
+            tmpl.nucleant_toml(self.app_name, self.module_name, self.target, self.entry),
         )
 
     def _write_app_sources(self) -> None:

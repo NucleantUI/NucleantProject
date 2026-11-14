@@ -145,8 +145,7 @@ class XcodeProject(NucleantProject):
         raise XcodeProjectError(f"Unknown variant {variant!r}; expected 'debug' or 'release'")
 
     def _env(self) -> dict[str, str]:
-        # nucleant.toml [swift.env] reaches package resolution this way —
-        # NUCLEANT_LOCAL_DEV, for instance, is read by every Nucleant manifest.
+        # nucleant.toml [swift.env] reaches package resolution this way.
         return {**environ, **self.bootstrap.build_env()}
 
     def _xcodebuild(self, action: list[str], destination: str, variant: str, extra: list[str] | None = None) -> None:

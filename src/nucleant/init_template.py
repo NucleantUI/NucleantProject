@@ -8,36 +8,12 @@ from .nucleant_toml import DEFAULT_SWIFT_VERSION
 NUCLEANTUI_URL = "https://github.com/NucleantUI/NucleantUI.git"
 
 
-def _dependency_block(nucleantui_path: str | None) -> str:
-    if nucleantui_path:
-        return f"""\
-[[swift.dependencies]]
-name = "NucleantUI"
-path = "{nucleantui_path}"
-products = ["NucleantUI"]
-# or from GitHub:
-# url = "{NUCLEANTUI_URL}"
-# branch = "master"
-"""
-    return f"""\
-[[swift.dependencies]]
-name = "NucleantUI"
-url = "{NUCLEANTUI_URL}"
-branch = "master"
-products = ["NucleantUI"]
-# or a local checkout:
-# path = "../NucleantUI"
-"""
-
-
 def nucleant_toml(
     app_name: str,
     module_name: str,
     target: str,
     entry: str,
-    nucleantui_path: str | None = None,
 ) -> str:
-    local_dev = "" if nucleantui_path else "# "
     return f"""\
 #### NucleantProject configuration ####
 #
@@ -71,13 +47,16 @@ sources = ["Sources/{target}"]
 # unsafe_flags = []
 
 [swift.env]
-# Read by every Nucleant Package.swift: build against sibling checkouts
-# (../NucleantApplication, ../NucleantVulkan, …) instead of GitHub releases.
-{local_dev}NUCLEANT_LOCAL_DEV = "1"
+# Environment for every Swift build of the app.
 # Emulator only: the virtual GPU has no VK_KHR_external_memory_fd.
 # NUCLEANT_ANDROID_USE_AHARDWAREBUFFER = "1"
 
-{_dependency_block(nucleantui_path)}
+[[swift.dependencies]]
+name = "NucleantUI"
+url = "{NUCLEANTUI_URL}"
+branch = "master"
+products = ["NucleantUI"]
+
 #### Android ####
 
 [android]

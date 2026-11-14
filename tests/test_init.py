@@ -51,15 +51,3 @@ def test_init_never_overwrites(tmp_path: Path):
     assert gitignore.startswith("node_modules/\n.build/\n")
     assert gitignore.count(".build/") == 1 and "project_dist/" in gitignore
 
-
-def test_init_with_local_nucleantui(tmp_path: Path):
-    ui = tmp_path / "dev" / "NucleantUI"
-    ui.mkdir(parents=True)
-    (ui / "Package.swift").write_text("// swift-tools-version: 6.2\n")
-    root = tmp_path / "dev" / "MyApp"
-    _init(root, nucleantui_path=ui)
-
-    data = NucleantToml.load(root).data
-    assert data["swift"]["dependencies"][0]["path"] == "../NucleantUI"
-    assert data["swift"]["env"]["NUCLEANT_LOCAL_DEV"] == "1"
-    assert '.package(path: "../NucleantUI")' in (root / "Package.swift").read_text()

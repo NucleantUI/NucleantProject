@@ -11,7 +11,7 @@ The wheel is `nucleant-project`; the module and command are `nucleant`.
 ```sh
 uv init --bare MyApp && cd MyApp
 uv add --dev nucleant-project          # or: uv add --dev ../NucleantProject
-uv run nucleant init                   # --nucleantui ../NucleantUI for a local checkout
+uv run nucleant init
 uv run nucleant toolchain install      # swiftly, Swift 6.3.3, Swift SDKs
 ```
 

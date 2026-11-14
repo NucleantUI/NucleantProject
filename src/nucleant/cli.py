@@ -63,11 +63,6 @@ class NucleantCLI:
         p_init.add_argument("path", nargs="?", default=".",
                             help="Project directory (default: current directory)")
         p_init.add_argument("--name", help="App name (default: directory name)")
-        p_init.add_argument(
-            "--nucleantui", type=Path, metavar="PATH",
-            help="Depend on a local NucleantUI checkout (sets NUCLEANT_LOCAL_DEV=1) "
-                 "instead of GitHub",
-        )
         p_init.set_defaults(func=self.init)
 
         AndroidCommands().register(sub)
@@ -84,7 +79,7 @@ class NucleantCLI:
     def init(self, args: argparse.Namespace) -> int:
         from .project_init import ProjectInit
 
-        ProjectInit(Path(args.path), app_name=args.name, nucleantui_path=args.nucleantui).run()
+        ProjectInit(Path(args.path), app_name=args.name).run()
         return 0
 
     def run(self, argv: list[str] | None = None) -> int:

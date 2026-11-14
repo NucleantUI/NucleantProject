@@ -76,7 +76,7 @@ def test_android_project(project: Path):
     assert '"arm64-v8a" to "aarch64-unknown-linux-android28"' in build
     assert "swiftExecutable, \"build\"" in build
     assert "java.srcDir(nucleantJavaDir)" in build
-    assert 'environment("NUCLEANT_LOCAL_DEV"' not in build  # only from [swift.env]
+    assert 'environment("NUCLEANT_ANDROID_USE_AHARDWAREBUFFER"' not in build  # only from [swift.env]
     assert "zipPythonAssets" not in build  # Python layer off
 
     activity = (dist / "app/src/main/java/org/example/myapp/MainActivity.java").read_text()
@@ -94,7 +94,9 @@ def test_android_project(project: Path):
 
 def test_android_env_reaches_swift_build(project: Path):
     toml = project / "nucleant.toml"
-    toml.write_text(toml.read_text().replace('# NUCLEANT_LOCAL_DEV = "1"', 'NUCLEANT_LOCAL_DEV = "1"'))
+    toml.write_text(toml.read_text().replace(
+        '# NUCLEANT_ANDROID_USE_AHARDWAREBUFFER = "1"', 'NUCLEANT_ANDROID_USE_AHARDWAREBUFFER = "1"'
+    ))
     dist = project / "project_dist" / "gradle"
     (dist / "gradle" / "wrapper").mkdir(parents=True)
     (dist / "gradle" / "wrapper" / "gradle-wrapper.jar").write_bytes(b"")
@@ -104,7 +106,7 @@ def test_android_env_reaches_swift_build(project: Path):
         platform="android", sdk_path="/opt/android-sdk"
     )
     build = (dist / "app" / "build.gradle.kts").read_text()
-    assert 'environment("NUCLEANT_LOCAL_DEV", "1")' in build
+    assert 'environment("NUCLEANT_ANDROID_USE_AHARDWAREBUFFER", "1")' in build
 
 
 def test_xcode_spec(project: Path):

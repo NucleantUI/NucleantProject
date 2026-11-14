@@ -26,11 +26,17 @@ def test_init_template_is_valid_toml_and_loads(project: Path):
     assert config.python_enabled is False
 
 
-def test_local_nucleantui_template_enables_local_dev():
-    text = init_template.nucleant_toml("A", "a", "A", "AApp", nucleantui_path="../NucleantUI")
+def test_template_uses_nucleantui_from_github():
+    text = init_template.nucleant_toml("A", "a", "A", "AApp")
     data = tomllib.loads(text)
-    assert data["swift"]["env"] == {"NUCLEANT_LOCAL_DEV": "1"}
-    assert data["swift"]["dependencies"][0]["path"] == "../NucleantUI"
+    assert data["swift"]["env"] == {}
+    assert data["swift"]["dependencies"] == [{
+        "name": "NucleantUI",
+        "url": "https://github.com/NucleantUI/NucleantUI.git",
+        "branch": "master",
+        "products": ["NucleantUI"],
+    }]
+    assert "LOCAL_DEV" not in text
 
 
 def test_missing_file_is_a_clear_error(tmp_path: Path):
