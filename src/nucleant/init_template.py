@@ -64,8 +64,8 @@ swiftly = true # false: use `swift` from PATH — it must be this exact version
 # project are all generated from it.
 
 [swift]
-target = "{target}"   # the Swift target / module the sources compile into
-entry = "{entry}"     # the NucleantApp type the Android Activity starts
+target = "{target}" # the Swift target / module the sources compile into
+entry = "{entry}" # the NucleantApp type the Android Activity starts
 sources = ["Sources/{target}"]
 # android_package = "project_dist/gradle/swift"   # the generated Android package
 # unsafe_flags = []
