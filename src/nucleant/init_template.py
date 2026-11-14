@@ -177,12 +177,15 @@ struct {entry}: NucleantApp {{
 
 @View
 struct ContentView {{
+    @State private var name = ""
     @State private var taps = 0
 
     var body: some View {{
         VStack(spacing: 16) {{
-            Text("Hello from {app_name}")
+            Text(name.isEmpty ? "Hello from {app_name}" : "Hello, \\(name)!")
                 .font(.system(size: 28, weight: .semibold))
+            TextField("Your name", text: $name)
+                .frame(maxWidth: 280)
             Text("Tapped \\(taps) times")
                 .foregroundStyle(.secondary)
             Button("Tap") {{ taps += 1 }}
