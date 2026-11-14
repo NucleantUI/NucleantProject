@@ -23,16 +23,10 @@ wheels = [
 [[package]]
 name = "nucleant-bootstraps"
 version = "0.1.0"
-source = { editable = "../nucleant-bootstraps" }
+source = { git = "https://github.com/NucleantUI/nucleant-bootstraps#ea7b51ed9d69ce79fa8ba4a1444df140bd9eb731" }
 dependencies = [
     { name = "pyyaml" },
 ]
-
-[package.metadata]
-requires-dist = [{ name = "pyyaml", specifier = ">=6.0.3" }]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8.0" }]
 
 [[package]]
 name = "nucleant-project"
@@ -50,7 +44,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "nucleant-bootstraps", editable = "../nucleant-bootstraps" },
+    { name = "nucleant-bootstraps", git = "https://github.com/NucleantUI/nucleant-bootstraps" },
     { name = "pyyaml", specifier = ">=6.0" },
 ]
 

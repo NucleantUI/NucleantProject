@@ -21,7 +21,7 @@ nucleant = "nucleant:main"
 module-name = "nucleant"
 
 [tool.uv.sources]
-nucleant-bootstraps = { path = "../nucleant-bootstraps", editable = true }
+nucleant-bootstraps = { git = "https://github.com/NucleantUI/nucleant-bootstraps" }
 
 [dependency-groups]
 dev = [
