@@ -16,7 +16,7 @@ uv run nucleant toolchain install      # swiftly, Swift 6.3.3, Swift SDKs
 ```
 
 `init` writes `nucleant.toml`, a starter app in `Sources/<App>/`,
-`.swift-version`, the Android templates and the desktop `Package.swift`. It
+`.swift-version`, the Android templates and the app's `Package.swift`. It
 never overwrites existing files.
 
 ## Run
@@ -46,17 +46,32 @@ tool.
 | --- | --- |
 | root | `app_name`, `bootstrap` (`nucleantui`), `command_plugins` |
 | `[toolchain]` | `swift` (default `6.3.3`), `swiftly`, `android_sdk`, `wasm_sdk` |
-| `[nucleantui]` | which NucleantUI: `branch` (default `master`), `up_to_major` or `exact`; `url` for a fork, `path` for a local fork |
-| `[swift]` | `target`, `entry`, `sources`, `android_package`, `[swift.env]`, `[[swift.dependencies]]` |
+| `[swift]` | `target`, `entry`, `package`, `android_package`, `[swift.env]` |
 | `[android]` | package name, archs, API levels, NDK, signing-free build settings, hooks |
 | `[ios]`, `[macos]` | bundle id, deployment target, version, info_plist, entitlements, team |
 | `[linux]`, `[wasm]` | platform switches (`[wasm]` makes `toolchain install` fetch the wasm SDK) |
 | `[python]` | `enabled` — the Python layer, transferred but not enabled yet |
 
-NucleantUI is the bootstrap's own dependency, so it is never listed in
-`[[swift.dependencies]]`; that list is for packages on top of it (same
-`branch` / `up_to_major` / `exact` / `path` keys). Both feed the desktop
-`Package.swift`, the Android Main Swift Package and the Xcode project.
+## The app's Package.swift
+
+The app is the Swift package at the project root. It belongs to the project:
+`init` writes a starter one and nucleant never rewrites it. NucleantUI and
+every other dependency are declared there, with whatever version rules and
+environment switches they need. nucleant.toml lists no packages. Every
+platform builds from it:
+
+- **macOS / Linux**: `swift run` in it.
+- **Android**: the generated `project_dist/gradle/swift` package holds
+  swift-java and the JNI bridge only. It depends on the app's package with
+  `.package(path: "../../..")` and links `[swift] target` as a library.
+  Gradle runs `swift build` with `ANDROID_BUILD=1`, and the starter manifest
+  turns the target into a library under it (an executable otherwise), the
+  same signal every Nucleant package reads. `[swift] entry` is the
+  `NucleantApp` type the Activity starts. The Android bridge constructs it
+  from outside the module, so it is `public` with a `public init()`.
+- **iOS / the macOS .app**: the Xcode project compiles the target's sources
+  and depends on the packages the target uses, as
+  `swift package dump-package` reports them.
 
 ## Toolchain
 

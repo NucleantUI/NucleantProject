@@ -1,8 +1,10 @@
 """``nucleant init`` — make a directory a NucleantProject (new or existing).
 
 Writes nucleant.toml, a starter NucleantUI app under ``Sources/<Target>``,
-``.swift-version``, the editable Android templates and the desktop
-``Package.swift``. Never overwrites a file that is already there.
+``.swift-version``, the editable Android templates and the app's
+``Package.swift`` — the project's own from then on: every platform builds from
+it and nucleant never rewrites it. Never overwrites a file that is already
+there.
 """
 
 from __future__ import annotations
@@ -49,8 +51,9 @@ class ProjectInit:
         self._update_gitignore()
         for name, content in ANDROID_TEMPLATE_FILES.items():
             self._write_if_missing(name, content)
-        package = DesktopProject(self.project_path).generate()
-        print(f"[nucleant] desktop package: {package / 'Package.swift'}")
+        package = DesktopProject(self.project_path).generate(init=True)
+        print(f"[nucleant] the app's package: {package / 'Package.swift'} — "
+              "declare its dependencies there")
         print(f"[nucleant] initialized {self.app_name} at {self.project_path}")
         print("[nucleant] next: `uv run nucleant toolchain install`, then e.g. "
               "`uv run nucleant apple macos run` or `uv run nucleant android run`")

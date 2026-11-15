@@ -23,22 +23,30 @@ def test_init_writes_a_project(tmp_path: Path):
     assert config.data["swift"]["entry"] == "HelloWorldApp"
 
     app = root / "Sources" / "HelloWorld" / "HelloWorldApp.swift"
-    assert "@main\nstruct HelloWorldApp: NucleantApp" in app.read_text()
+    assert "@main\npublic struct HelloWorldApp: NucleantApp {\n    public init() {}" in app.read_text()
     assert "@View\nstruct ContentView" in app.read_text()
     assert (root / ".swift-version").read_text().strip() == "6.3.3"
     assert (root / "build.tmpl.gradle.kts").read_text().startswith("// nucleant-template: 1")
     assert "nucleant-template: 1" in (root / "AndroidManifest.tmpl.xml").read_text()
+    # The app's package is the project's own: no generated marker, the app a
+    # library under ANDROID_BUILD and an executable otherwise.
     manifest = (root / "Package.swift").read_text()
-    assert "nucleant:generated-swift-package" in manifest
-    assert '.executableTarget(\n            name: "HelloWorld"' in manifest
-    assert 'url: "https://github.com/NucleantUI/NucleantUI.git", branch: "master"' in manifest
+    assert "nucleant:generated-swift-package" not in manifest
+    assert 'environment["ANDROID_BUILD"] != nil' in manifest
+    assert '? .target(name: "HelloWorld", dependencies: appDependencies, path: "Sources/HelloWorld")' in manifest
+    assert ': .executableTarget(name: "HelloWorld"' in manifest
+    assert '? .library(name: "HelloWorld", targets: ["HelloWorld"])' in manifest
+    assert '.package(url: "https://github.com/NucleantUI/NucleantUI.git", branch: "master")' in manifest
+    toml = (root / "nucleant.toml").read_text()
+    assert "[nucleantui]" not in toml and "swift.dependencies" not in toml
     assert "project_dist/" in (root / ".gitignore").read_text()
 
 
 def test_init_never_overwrites(tmp_path: Path):
     root = tmp_path / "App"
     root.mkdir()
-    (root / "nucleant.toml").write_text('app_name = "Mine"\n[swift]\nsources = ["Sources/App"]\n')
+    (root / "nucleant.toml").write_text('app_name = "Mine"\n[swift]\ntarget = "App"\n')
+    (root / "Package.swift").write_text("// mine\n")
     (root / "Sources" / "App").mkdir(parents=True)
     (root / "Sources" / "App" / "Mine.swift").write_text("// mine\n")
     (root / ".gitignore").write_text("node_modules/\n.build/\n")
@@ -47,6 +55,7 @@ def test_init_never_overwrites(tmp_path: Path):
     assert (root / "nucleant.toml").read_text().startswith('app_name = "Mine"')
     assert (root / "Sources" / "App" / "Mine.swift").read_text() == "// mine\n"
     assert not (root / "Sources" / "App" / "AppApp.swift").exists()
+    assert (root / "Package.swift").read_text() == "// mine\n"
     gitignore = (root / ".gitignore").read_text()
     assert gitignore.startswith("node_modules/\n.build/\n")
     assert gitignore.count(".build/") == 1 and "project_dist/" in gitignore

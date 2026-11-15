@@ -70,8 +70,10 @@ class DesktopProject(NucleantProject):
         super().__init__(project_path)
         self.bootstrap = self.make_bootstrap(SwiftDelegate(self))
 
-    def generate(self) -> Path:
-        package = self.bootstrap.generate(platform="desktop")
+    def generate(self, init: bool = False) -> Path:
+        """The app's own package. ``init``: write the starter Package.swift
+        when the project has none; otherwise one has to be there."""
+        package = self.bootstrap.generate(platform="desktop", init=init)
         assert package is not None
         return package
 
