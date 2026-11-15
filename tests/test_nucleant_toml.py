@@ -26,12 +26,12 @@ def test_init_template_is_valid_toml_and_loads(project: Path):
     assert config.python_enabled is False
 
 
-def test_template_uses_nucleantui_from_github():
+def test_template_lists_no_packages():
+    """Packages are Package.swift's business, NucleantUI included."""
     text = init_template.nucleant_toml("A", "a", "A", "AApp")
     data = tomllib.loads(text)
-    assert data["swift"]["env"] == {}
-    assert data["nucleantui"] == {"branch": "master"}
-    assert "dependencies" not in data["swift"]  # NucleantUI is implicit
+    assert data["swift"] == {"target": "A", "entry": "AApp", "env": {}}
+    assert "nucleantui" not in data
     assert "LOCAL_DEV" not in text
 
 

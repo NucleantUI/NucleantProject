@@ -31,40 +31,22 @@ swiftly = true # false: use `swift` from PATH — it must be this exact version
 # android_sdk = "swift-{DEFAULT_SWIFT_VERSION}-RELEASE_android"
 # wasm_sdk = "swift-{DEFAULT_SWIFT_VERSION}-RELEASE_wasm"
 
-#### NucleantUI ####
-# The nucleantui bootstrap always builds the app against NucleantUI; this
-# picks which. One of branch / up_to_major / exact.
-
-[nucleantui]
-branch = "master"
-# up_to_major = "0.1.0" # 0.1.0 or newer, below 1.0.0
-# exact = "0.1.0"
-# url = "https://github.com/<you>/NucleantUI.git" # a fork
-# path = "../NucleantUI" # a local fork; takes no version
-
 #### The app's Swift ####
-# One list of sources and dependencies feeds every platform: the desktop
-# Package.swift (`swift run`), the Android Main Swift Package and the Xcode
-# project are all generated from it.
+# The app is the Swift package in Package.swift — yours, written once by
+# `nucleant init` and never rewritten. Declare NucleantUI and every other
+# dependency there; macOS/Linux (`swift run`), the Android Gradle project
+# (which depends on it by path) and the Xcode project all build from it.
+# This table only says which part of it the platforms start.
 
 [swift]
-target = "{target}" # the Swift target / module the sources compile into
-entry = "{entry}" # the NucleantApp type the Android Activity starts
-sources = ["Sources/{target}"]
+target = "{target}" # the app's target in Package.swift (a library under ANDROID_BUILD)
+entry = "{entry}" # the public NucleantApp type the Android Activity starts
 # android_package = "project_dist/gradle/swift"   # the generated Android package
-# unsafe_flags = []
 
 [swift.env]
 # Environment for every Swift build of the app.
 # Emulator only: the virtual GPU has no VK_KHR_external_memory_fd.
 # NUCLEANT_ANDROID_USE_AHARDWAREBUFFER = "1"
-
-# More Swift packages, besides NucleantUI:
-# [[swift.dependencies]]
-# name = "Yams"
-# url = "https://github.com/jpsim/Yams.git"
-# up_to_major = "6.0.0" # or branch / exact; or path = "../Yams"
-# products = ["Yams"]
 
 #### Android ####
 
@@ -165,9 +147,13 @@ def app_swift(app_name: str, entry: str) -> str:
     return f"""\
 import NucleantUI
 
+/// Public, with a public init: on Android this module is a library, and the
+/// Activity's native side constructs the app from outside it.
 @main
-struct {entry}: NucleantApp {{
-    var body: some Scene {{
+public struct {entry}: NucleantApp {{
+    public init() {{}}
+
+    public var body: some Scene {{
         WindowGroup("{app_name}") {{
             ContentView()
         }}
