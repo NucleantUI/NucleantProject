@@ -74,7 +74,7 @@ Add PyShader, and apply its build plugin to the app's target, on both sides of t
 
 ```swift title="Package.swift" hl_lines="3 10 14 16"
 let dependencies: [Package.Dependency] = [
-    .package(url: "https://github.com/NucleantUI/NucleantUI.git", .upToNextMinor(from: "0.3.1")),
+    .package(url: "https://github.com/NucleantUI/NucleantUI.git", .upToNextMinor(from: "0.3.2")),
     .package(url: "https://github.com/NucleantUI/PyShader.git", .upToNextMinor(from: "0.0.8")),
 ]
 

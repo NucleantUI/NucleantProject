@@ -35,4 +35,4 @@ For day-to-day work on the desktop, you don't need to: `swift run` is the whole 
     uv run nucleant apple macos archive --upload
     ```
 
-    See [iOS & macOS](apple.md).
+    See [macOS](macos.md) for what the `.app` adds, and [iOS & macOS](apple.md) for the Xcode project.

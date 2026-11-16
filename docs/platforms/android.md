@@ -82,6 +82,8 @@ The Activity, `org.nucleantui.NucleantActivity`, comes from **NucleantApplicatio
 
 Resources are looked up under `NUCLEANT_APP_PATH`. See [Resources](../configuration/package-swift.md#resources).
 
+`NucleantActivity` also reports its lifecycle to the window: resumed is [`scenePhase`](../guides/scene-phase.md#android) `.active`, paused is `.inactive`, and stopped is `.background`. It stops the frames in `onPause()` and starts them again in `onResume()`, so an app that isn't shown draws nothing.
+
 ---
 
 ## Templates
