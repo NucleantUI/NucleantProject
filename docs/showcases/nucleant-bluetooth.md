@@ -63,7 +63,7 @@ Add NucleantBluetooth to the starter manifest:
 
 ```swift title="Package.swift"
 let dependencies: [Package.Dependency] = [
-    .package(url: "https://github.com/NucleantUI/NucleantUI.git", branch: "master"),
+    .package(url: "https://github.com/NucleantUI/NucleantUI.git", .upToNextMinor(from: "0.3.1")),
     .package(url: "https://github.com/NucleantUI/NucleantBluetooth", branch: "main"),
 ]
 

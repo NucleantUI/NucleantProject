@@ -88,8 +88,8 @@ let isAndroid = environment["ANDROID_BUILD"] != nil
     || environment["SWIFT_ANDROID_HOME"] != nil
 
 let dependencies: [Package.Dependency] = [
-    .package(url: "https://github.com/NucleantUI/NucleantUI.git", branch: "master"),
-    .package(url: "https://github.com/NucleantUI/NucleantVLC", from: "0.0.3"),
+    .package(url: "https://github.com/NucleantUI/NucleantUI.git", .upToNextMinor(from: "0.3.1")),
+    .package(url: "https://github.com/NucleantUI/NucleantVLC", .upToNextMinor(from: "0.0.3")),
 ]
 
 let appDependencies: [Target.Dependency] = [
