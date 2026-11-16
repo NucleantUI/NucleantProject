@@ -91,6 +91,23 @@ A local checkout works the same: `.package(path: "../NucleantBluetooth")`. The X
 
 ---
 
+## Updating dependencies
+
+Each build resolves the app's packages itself, and pins what it resolved in a `Package.resolved` of its own:
+
+| Build | Pins in |
+|---|---|
+| `swift run` (macOS, Linux) | `Package.resolved`, next to `Package.swift` |
+| Android | `project_dist/gradle/swift/Package.resolved` |
+| iOS and the macOS `.app` | `project_dist/xcode/<app_name>.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` |
+
+A new release that a version rule allows, such as a new 0.1.x under `.upToNextMinor(from: "0.1.0")`, reaches a build only once that build updates. This includes the packages your packages depend on. Updating one build doesn't update the others.
+
+- **`swift run`**: `swift package update` in the project, with the [pinned toolchain](../getting-started/toolchain.md): `swiftly run swift package update +6.3.3`.
+- **Android and the Xcode project**: delete their `Package.resolved`. The next `nucleant android run` or `nucleant apple … run` resolves again. Each resolves with the environment it builds with (`ANDROID_BUILD`, `[swift.env]`), which a `swift package update` run by hand wouldn't have.
+
+---
+
 ## Packages that bring their own Android half
 
 Some packages need Java on Android, for example a callback class Swift can't subclass. A package ships that Java in an `Android/java` folder at its root. The Gradle build compiles the `Android/java` of **every package in the Swift graph** together with the app, taken from the same checkouts SwiftPM resolved. Adding the package to `Package.swift` is all it takes.

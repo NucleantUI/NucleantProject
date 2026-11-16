@@ -63,7 +63,7 @@ Without a surface, the window is in the background as well. Coming back, Android
 
 Rotating doesn't change the phase. The frames still stop in `onPause()` and start again in `onResume()`, so a paused app draws nothing.
 
-Android phases come with NucleantApplication 0.1.3. NucleantUI takes NucleantApplication up to its next minor version, so a fresh resolve picks it up. In an existing project, run `swift package update`.
+Android phases come with NucleantApplication 0.1.3. NucleantUI takes NucleantApplication up to its next minor version, so a fresh resolve picks it up. An existing project keeps the version its Android build pinned until it updates that pin: delete `project_dist/gradle/swift/Package.resolved` (see [Updating dependencies](../configuration/package-swift.md#updating-dependencies)).
 
 ### Linux
 
