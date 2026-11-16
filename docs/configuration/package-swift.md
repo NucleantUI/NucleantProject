@@ -103,8 +103,24 @@ Each build resolves the app's packages itself, and pins what it resolved in a `P
 
 A new release that a version rule allows, such as a new 0.1.x under `.upToNextMinor(from: "0.1.0")`, reaches a build only once that build updates. This includes the packages your packages depend on. Updating one build doesn't update the others.
 
-- **`swift run`**: `swift package update` in the project, with the [pinned toolchain](../getting-started/toolchain.md): `swiftly run swift package update +6.3.3`.
-- **Android and the Xcode project**: delete their `Package.resolved`. The next `nucleant android run` or `nucleant apple … run` resolves again. Each resolves with the environment it builds with (`ANDROID_BUILD`, `[swift.env]`), which a `swift package update` run by hand wouldn't have.
+Deleting a `Package.resolved` isn't enough. Each build also keeps its checkouts, and SwiftPM pins again whatever is checked out when that still satisfies the rule. Update instead.
+
+**`swift run`**: in the project, with the [pinned toolchain](../getting-started/toolchain.md):
+
+```bash
+swiftly run swift package update +6.3.3
+```
+
+**Android**: in the Gradle project's Swift package, against the Android build's checkouts (`--scratch-path`). Set the same environment the build has: `ANDROID_BUILD=1` and your `[swift.env]`:
+
+```bash
+cd project_dist/gradle/swift
+ANDROID_BUILD=1 swiftly run swift package --scratch-path ../app/build/swift update +6.3.3
+```
+
+Name packages after `update` to move only those, for example `update NucleantApplication`. The next `nucleant android run` builds with the new pins.
+
+**iOS and the macOS `.app`**: open the project with `uv run nucleant apple xcode open`, then choose **File ▸ Packages ▸ Update to Latest Package Versions**.
 
 ---
 
