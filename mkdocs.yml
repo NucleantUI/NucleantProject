@@ -1,0 +1,121 @@
+site_name: NucleantProject
+site_description: Build and run NucleantUI apps on Android, iOS, macOS and Linux.
+site_url: https://nucleantui.github.io/NucleantProject/
+repo_url: https://github.com/NucleantUI/NucleantProject
+repo_name: NucleantUI/NucleantProject
+edit_uri: ""
+
+theme:
+  name: material
+  logo: assets/logo.png
+  favicon: assets/favicon.png
+  # Dark first: the default, like the logo. Light stays one click away.
+  palette:
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+  features:
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - navigation.footer
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - search.highlight
+    - search.suggest
+    - search.share
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+  font:
+    text: Inter
+    code: JetBrains Mono
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/NucleantUI/NucleantProject
+      name: NucleantProject on GitHub
+    - icon: material/book-open-variant
+      link: https://nucleantui.github.io/NucleantUI/
+      name: NucleantUI documentation
+    - icon: material/shimmer
+      link: https://nucleantui.github.io/PyShader/
+      name: PyShader documentation
+  generator: false
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.snippets
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.mark
+  - pymdownx.critic
+  - pymdownx.keys
+  - attr_list
+  - md_in_html
+  - def_list
+  - tables
+  - footnotes
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+plugins:
+  - search
+
+validation:
+  anchors: warn
+  unrecognized_links: warn
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - New Project: getting-started/new-project.md
+      - Toolchain: getting-started/toolchain.md
+  - Configuration:
+      - nucleant.toml Reference: configuration/nucleant-toml.md
+      - The App's Package.swift: configuration/package-swift.md
+  - Platforms:
+      - Desktop (swift run): platforms/desktop.md
+      - Android (Gradle): platforms/android.md
+      - iOS & macOS (Xcode): platforms/apple.md
+  - Showcases:
+      - NucleantVLC: showcases/nucleant-vlc.md
+      - NucleantBluetooth: showcases/nucleant-bluetooth.md
+  - Guides:
+      - Bundling PyShader Shaders: guides/pyshader.md
+  - Related Docs:
+      - NucleantUI: https://nucleantui.github.io/NucleantUI/
+      - PyShader: https://nucleantui.github.io/PyShader/
