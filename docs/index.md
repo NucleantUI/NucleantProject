@@ -186,6 +186,14 @@ uv run nucleant apple sim run --name "iPhone 17"
 
     [:octicons-arrow-right-24: PyShader guide](guides/pyshader.md)
 
+-   :material-sleep:{ .lg .middle } **App Lifecycle**
+
+    ---
+
+    `@Environment(\.scenePhase)`: what makes a window active, inactive or background on macOS, iOS and Android.
+
+    [:octicons-arrow-right-24: scenePhase guide](guides/scene-phase.md)
+
 -   :material-book-open-variant:{ .lg .middle } **NucleantUI docs**
 
     ---

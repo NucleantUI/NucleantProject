@@ -109,6 +109,7 @@ nav:
       - The App's Package.swift: configuration/package-swift.md
   - Platforms:
       - Desktop (swift run): platforms/desktop.md
+      - macOS: platforms/macos.md
       - Android (Gradle): platforms/android.md
       - iOS & macOS (Xcode): platforms/apple.md
   - Showcases:
@@ -116,6 +117,7 @@ nav:
       - NucleantBluetooth: showcases/nucleant-bluetooth.md
   - Guides:
       - Bundling PyShader Shaders: guides/pyshader.md
+      - App Lifecycle (scenePhase): guides/scene-phase.md
   - Related Docs:
       - NucleantUI: https://nucleantui.github.io/NucleantUI/
       - PyShader: https://nucleantui.github.io/PyShader/

@@ -82,6 +82,8 @@ The Activity, `org.nucleantui.NucleantActivity`, comes from **NucleantApplicatio
 
 Resources are looked up under `NUCLEANT_APP_PATH`. See [Resources](../configuration/package-swift.md#resources).
 
+`NucleantActivity` also stops the frames in `onPause()` and starts them again in `onResume()`, so an app that isn't shown draws nothing. The window's [`scenePhase`](../guides/scene-phase.md#android) stays `.active` on Android for now.
+
 ---
 
 ## Templates

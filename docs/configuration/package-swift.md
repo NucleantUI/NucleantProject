@@ -34,7 +34,7 @@ let isAndroid = environment["ANDROID_BUILD"] != nil
     || environment["SWIFT_ANDROID_HOME"] != nil
 
 let dependencies: [Package.Dependency] = [
-    .package(url: "https://github.com/NucleantUI/NucleantUI.git", .upToNextMinor(from: "0.3.1")),
+    .package(url: "https://github.com/NucleantUI/NucleantUI.git", .upToNextMinor(from: "0.3.2")),
 ]
 
 let appDependencies: [Target.Dependency] = [
@@ -74,7 +74,7 @@ Add the package to `dependencies` and its product to `appDependencies`:
 
 ```swift title="Package.swift"
 let dependencies: [Package.Dependency] = [
-    .package(url: "https://github.com/NucleantUI/NucleantUI.git", .upToNextMinor(from: "0.3.1")),
+    .package(url: "https://github.com/NucleantUI/NucleantUI.git", .upToNextMinor(from: "0.3.2")),
     .package(url: "https://github.com/NucleantUI/NucleantBluetooth", branch: "main"),
 ]
 

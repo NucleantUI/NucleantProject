@@ -5,6 +5,8 @@ Xcode is only needed where `swift run` can't go:
 - **iOS**: devices and the Simulator.
 - **macOS as a real `.app`**: signed, with entitlements, for the Mac App Store.
 
+Both ways to run on a Mac, side by side, are on [macOS](macos.md).
+
 For those, nucleant generates an Xcode project from `nucleant.toml` and the app's `Package.swift` with [XcodeGen](https://github.com/yonaskolb/XcodeGen), then drives `xcodebuild`, `simctl` and `devicectl`. Your app's sources don't change: the same `@main …: NucleantApp` is the entry point on every platform.
 
 ```bash

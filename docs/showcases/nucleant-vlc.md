@@ -88,7 +88,7 @@ let isAndroid = environment["ANDROID_BUILD"] != nil
     || environment["SWIFT_ANDROID_HOME"] != nil
 
 let dependencies: [Package.Dependency] = [
-    .package(url: "https://github.com/NucleantUI/NucleantUI.git", .upToNextMinor(from: "0.3.1")),
+    .package(url: "https://github.com/NucleantUI/NucleantUI.git", .upToNextMinor(from: "0.3.2")),
     .package(url: "https://github.com/NucleantUI/NucleantVLC", .upToNextMinor(from: "0.0.3")),
 ]
 
@@ -157,6 +157,8 @@ On the desktop, the same project is `swift run`, with files, folders or URLs to 
 ```bash
 uv run nucleant apple macos run -- ~/Movies/clip.mkv
 ```
+
+The player plays on while its window is minimized or the app is hidden. To pause it there, see [App Lifecycle: pause the player](../guides/scene-phase.md#example-pause-the-player).
 
 On iOS, `uv run nucleant apple sim run` builds the same sources through the Xcode project. In the iOS Simulator the video plays, but the controls drawn by Skia don't show, because of a Simulator GPU limitation ([details](../platforms/apple.md#simulator-and-devices)). A real device doesn't have it.
 
