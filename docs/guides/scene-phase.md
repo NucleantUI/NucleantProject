@@ -39,7 +39,7 @@ The phase itself comes from the platform, through the app nucleant builds for it
 |---|---|---|---|
 | **macOS** (`swift run` and the `.app`) | Otherwise, including behind other windows or with another app in front | Minimized into the Dock | The app is hidden (++cmd+h++) |
 | **iOS** | In use | The app switcher, Control Center, a call, and on the way to or from the background | Off screen: another app, the Home Screen, the device locked |
-| **Android** | Always, for now | — | — |
+| **Android** | The Activity is resumed | Paused: a dialog or a permission request over it, another app in front in split screen, and on the way to the background | Stopped: another app, the Home screen, the screen off. Also while there is no surface to draw into |
 | **Linux** | Always | — | — |
 
 When the phase changes, NucleantUI runs one frame at once, so `onChange(of: scenePhase)` runs straight away. It doesn't wait for the next tick, which a window out of sight doesn't get.
@@ -57,9 +57,13 @@ The window follows its scene's notifications: activate, deactivate, enter backgr
 
 ### Android
 
-The window's phase doesn't change on Android yet. It stays `.active`, so `onChange(of: scenePhase)` doesn't run there.
+The window follows the Activity. `NucleantActivity`, which nucleant compiles in from NucleantApplication's `Android/java`, reports `onStart()`, `onResume()`, `onPause()` and `onStop()`, and the phase follows them. A permission request is a dialog over the Activity, so asking for one makes the window `.inactive` until it is answered.
 
-The app does stop drawing when it isn't shown. `NucleantActivity`, which nucleant compiles in from NucleantApplication's `Android/java`, stops the frames in `onPause()` and starts them again in `onResume()`. So a paused app costs no frames. It just doesn't tell its views.
+Without a surface, the window is in the background as well. Coming back, Android resumes the Activity before its new surface exists, so the window goes from `.background` straight to `.active` once there is something to draw into. It enters `.background` before the old surface is destroyed. That way the frame a phase change runs never draws into a surface that is gone.
+
+Rotating doesn't change the phase. The frames still stop in `onPause()` and start again in `onResume()`, so a paused app draws nothing.
+
+Android phases come with NucleantApplication 0.1.3. NucleantUI takes NucleantApplication up to its next minor version, so a fresh resolve picks it up. In an existing project, run `swift package update`.
 
 ### Linux
 
@@ -69,7 +73,7 @@ The window stays `.active`.
 
 ## Example: pause the player
 
-The [NucleantVLC showcase](../showcases/nucleant-vlc.md) plays on while the window is minimized or the app is hidden. To pause it when the window leaves `.active`, and play again once it is back, add this to `PlayerScreen` in `Sources/VlcPlayer/PlayerViews.swift`:
+The [NucleantVLC showcase](../showcases/nucleant-vlc.md) doesn't look at the phase. To pause the player when the window leaves `.active`, and play again once it is back, add this to `PlayerScreen` in `Sources/VlcPlayer/PlayerViews.swift`:
 
 ```swift title="Sources/VlcPlayer/PlayerViews.swift" hl_lines="4 5 10 11 12 13 14 15 16 17 18 19"
 @View
@@ -95,6 +99,6 @@ struct PlayerScreen {
 }
 ```
 
-`resumeOnActive` makes sure the window only plays again if the phase paused it. A video you paused yourself stays paused. On iOS the window passes `.inactive` on its way to and from `.background`, so the first change away from `.active` pauses the player, and coming back plays it once.
+`resumeOnActive` makes sure the window only plays again if the phase paused it. A video you paused yourself stays paused. Going to the background, the window passes `.inactive` first, so the first change away from `.active` pauses the player. Coming back plays it once, whether the window comes through `.inactive` (iOS) or straight to `.active` (Android).
 
 The NucleantUI example [Pomodoro](https://nucleantui.github.io/NucleantUI/documentation/nucleantui/pomodoroexample/) does the same with a timer. It stops the tick while the window is out of use, then catches the session up on the time away once the window is active again.
