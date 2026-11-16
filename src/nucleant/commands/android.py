@@ -37,7 +37,7 @@ class AndroidCommands:
         target = p_run.add_mutually_exclusive_group()
         target.add_argument("--uuid", help="adb serial of a device or running emulator")
         target.add_argument("--name", help="AVD name to boot")
-        p_run.add_argument("--clean", action="store_true", help="Clean before building")
+        p_run.add_argument("--clean", action="store_true", help="Start over: remove project_dist/gradle (Gradle and Swift builds, the Android Package.resolved) and resolve the packages again")
         p_run.add_argument("--logcat", action="store_true", help="Follow the app's logcat after launch")
         p_run.set_defaults(func=self.run)
 
@@ -49,7 +49,7 @@ class AndroidCommands:
         kind = p_archive.add_mutually_exclusive_group()
         kind.add_argument("--aar", action="store_true", help="Build an AAR library")
         kind.add_argument("--bundle", action="store_true", help="Build an AAB (Android App Bundle)")
-        p_archive.add_argument("--clean", action="store_true", help="Clean before building")
+        p_archive.add_argument("--clean", action="store_true", help="Start over: remove project_dist/gradle (Gradle and Swift builds, the Android Package.resolved) and resolve the packages again")
         p_archive.set_defaults(func=self.archive)
 
         # --- GENERATE ---

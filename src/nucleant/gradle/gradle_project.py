@@ -259,12 +259,42 @@ class GradleProject(NucleantProject):
         bundle: bool = False,
         clean: bool = False,
     ) -> list[Path]:
-        """pre_build hook → generate → gradlew assemble/bundle."""
+        """pre_build hook → generate → gradlew assemble/bundle.
+
+        ``clean`` starts over: the generated Gradle project goes first (see
+        ``wipe``), so nothing from an earlier build is reused.
+        """
+        if clean:
+            self.wipe()
         run_hook(self.android_data.pre_build, self.project_path)
         self.generate(aar=aar, clean=clean)
         return self.gradle_assemble(variant, aar=aar, bundle=bundle, clean=clean)
 
     archive = build
+
+    def wipe(self) -> None:
+        """Remove the generated Gradle project, ``project_dist/gradle``, whole.
+
+        What ``--clean`` starts over from. Gradle's caches and outputs, the
+        Swift build with its checkouts, the staged libraries, resources and
+        Java, and the Android build's ``Package.resolved`` all go. The next
+        build resolves the packages again from the version rules in
+        ``Package.swift``: a ``branch:`` dependency at its newest commit, a
+        version rule at its newest release. Everything here is generated, and
+        ``generate`` writes it back.
+        """
+        gradle_dir = self.gradle_dir
+        if not gradle_dir.is_dir():
+            return
+        print(f"[nucleant] --clean: removing {gradle_dir.relative_to(self.project_path)}")
+
+        def make_writable(function, path, _exc) -> None:
+            # SwiftPM checks its checkouts out read-only, which Windows
+            # refuses to delete.
+            os.chmod(path, 0o700)
+            function(path)
+
+        shutil.rmtree(gradle_dir, onexc=make_writable)
 
     # ------------------------------------------------------------------
     # Devices / run

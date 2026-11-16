@@ -111,14 +111,18 @@ Deleting a `Package.resolved` isn't enough. Each build also keeps its checkouts,
 swiftly run swift package update +6.3.3
 ```
 
-**Android**: in the Gradle project's Swift package, against the Android build's checkouts (`--scratch-path`). Set the same environment the build has: `ANDROID_BUILD=1` and your `[swift.env]`:
+**Android**: build with `--clean`. It starts the Android build over, `Package.resolved` included, so every package resolves to the newest version its rule allows:
+
+```bash
+uv run nucleant android run --clean
+```
+
+To move only some packages and keep the build, update them in the Gradle project's Swift package, against the Android build's checkouts (`--scratch-path`). Set the same environment the build has: `ANDROID_BUILD=1` and your `[swift.env]`:
 
 ```bash
 cd project_dist/gradle/swift
-ANDROID_BUILD=1 swiftly run swift package --scratch-path ../app/build/swift update +6.3.3
+ANDROID_BUILD=1 swiftly run swift package --scratch-path ../app/build/swift update NucleantApplication +6.3.3
 ```
-
-Name packages after `update` to move only those, for example `update NucleantApplication`. The next `nucleant android run` builds with the new pins.
 
 **iOS and the macOS `.app`**: open the project with `uv run nucleant apple xcode open`, then choose **File ▸ Packages ▸ Update to Latest Package Versions**.
 

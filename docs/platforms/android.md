@@ -7,8 +7,11 @@ uv run nucleant android run                      # first connected device, else 
 uv run nucleant android run --name Pixel_8       # boot this AVD
 uv run nucleant android run --uuid emulator-5554 # this adb serial
 uv run nucleant android run --logcat             # then follow the app's logcat
-uv run nucleant android run release --clean      # a clean release build
+uv run nucleant android run release --clean      # start over: a fresh release build
 ```
+
+!!! tip "`--clean` starts over"
+    `--clean` removes `project_dist/gradle` before generating it again. That covers Gradle's caches and outputs, the Swift build with its checkouts, and the Android build's `Package.resolved`. The packages are resolved again from the version rules in `Package.swift`: a `branch:` dependency at its newest commit, a version rule at its newest release. Without `--clean`, a build keeps the versions it pinned and rebuilds only what changed. `archive --clean` works the same way.
 
 ---
 
@@ -21,7 +24,7 @@ uv run nucleant android run release --clean      # a clean release build
     error: emulator-5554 runs x86_64, but [android] archs only builds arm64-v8a. Add "x86_64" to archs in nucleant.toml.
     ```
 
-3. **Runs `pre_build`**, then **generates** `project_dist/gradle` and its Swift package.
+3. **Runs `pre_build`**, then **generates** `project_dist/gradle` and its Swift package. With `--clean`, it removes `project_dist/gradle` first.
 4. **Runs Gradle.** For each ABI in `archs`, Gradle runs `swift build` for the Android triple with the Android Swift SDK and `ANDROID_BUILD=1`. It stages the `.so` files into `jniLibs`, the SwiftPM resource bundles into assets, and each package's `Android/java` into the Java sources. Then it assembles the APK.
 5. **Installs** the APK that matches the device's ABI and **launches** it.
 
